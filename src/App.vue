@@ -38,6 +38,7 @@
 import { ref, onMounted, watch } from 'vue';
 import { VueDraggableNext as draggable } from 'vue-draggable-next';
 import Lunar from 'lunar-javascript';
+import getFilteredNews from '../src/tools/newsCrawler.js';
 
 const newsList = ref([]);
 const dateInfo = ref('');
@@ -61,7 +62,7 @@ const getDateInfo = () => {
   const lunarMonth = lunar.getMonthInChinese();
   const lunarDay = lunar.getDayInChinese();
 
-  dateInfo.value = `${year}年${month}月${day}日 ${lunarMonth}${lunarDay} ${week}`;
+  dateInfo.value = `${year}年${month}月${day}日 ${lunarMonth}月${lunarDay} ${week}`;
 };
 
 const outputNews = () => {
@@ -78,11 +79,16 @@ const toggleDate = () => {
 };
 
 const addNews = () => {
-  if (newNews.value.trim()) {
-    newsList.value.push(newNews.value);
-    newNews.value = '';
-    saveNewsToLocalStorage();
-  }
+  const trimmedNews = newNews.value.trim();
+  if (!trimmedNews) return;
+  
+  newsList.value = [
+    ...newsList.value.filter(n => n.trim().toLowerCase() !== trimmedNews.trim().toLowerCase()),
+    trimmedNews
+  ];
+  
+  newNews.value = '';
+  saveNewsToLocalStorage();
 };
 
 const startEdit = (index) => {
@@ -127,10 +133,23 @@ const clearNewsList = () => {
   }
 };
 
-onMounted(() => {
+const fetchNews = async () => {
+    const news = await getFilteredNews();
+    const uniqueNews = news.filter(title => {
+        const trimmedTitle = title.trim();
+        return !newsList.value.some(existingTitle => {
+            return existingTitle.trim() === trimmedTitle;
+        });
+    });
+    newsList.value = [...newsList.value, ...uniqueNews];
+    saveNewsToLocalStorage();
+};
+
+onMounted(async () => {
   loadNewsFromLocalStorage();
   getDateInfo();
   setInterval(getDateInfo, 1000 * 60);
+  await fetchNews();
 });
 
 watch(newsList, () => {
